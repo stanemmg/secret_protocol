@@ -31,12 +31,13 @@ static socket_status_e create_socket(int *sockfd, struct sockaddr_in* servaddr) 
 }
 
 static int16_t get_checksum(uint8_t *buffer, uint8_t length) {
-    uint16_t checksum = 1;
-    uint16_t counter = 0;
+    int checksum = 1;
+    char counter = 0;
     uint8_t *byte = buffer;
-    for(;byte <= buffer + length; byte++) {
-        checksum = (checksum + counter + *byte) % 0xFFF1;
-        counter = (counter + 1) % 0x100;
+    for(size_t i = 0;i < length; i++) {
+        uint8_t byte = buffer[i];
+        checksum = (checksum + counter + byte) % 65521;
+        counter = (counter + 1) % 256;
     }
     return checksum;
 }
@@ -57,21 +58,6 @@ static void print_message(client_message_t *message) {
             message->msg.counter,
             message->msg.payload_cs,
             message->msg.header_cs,
-            message->msg.payload);
-}
-
-static void print_server_message(server_message_t *message) {
-    printf( "\nMagic: %04x\n"
-            "Length: %u\n"
-            "Message Type: %u\n"
-            "Timestamp: %lu\n"
-            "Counter: %u\n"
-            "Payload: %s\n",
-            message->msg.magic, 
-            message->msg.length,
-            message->msg.message_type,
-            message->msg.timestamp,
-            message->msg.counter,
             message->msg.payload);
 }
 
@@ -101,16 +87,18 @@ int main() {
 
     client_message_t nameMessage = {
         .msg.message_type = TYPE_1,
+        .msg.counter = 203,
         .msg.payload = "[Stanley Garcia]",
         .msg.length = sizeof("[Stanley Garcia]"),
     };
 
     send_message(&nameMessage, &sockfd);
 
-    server_message_t receivedMsg;
+    client_message_t receivedMsg;
     bzero(&receivedMsg.buffer, sizeof(&receivedMsg.buffer));
-    read(sockfd, &receivedMsg.buffer, PROTOCOL_SERVER_MESSAGE_SIZE);
-    print_server_message(&receivedMsg);
+    int bytes = read(sockfd, &receivedMsg.buffer, PROTOCOL_CLIENT_MESSAGE_SIZE);
+    printf("Received Bytes: %u", bytes);
+    print_message(&receivedMsg);
 	close(sockfd);
 }
 
